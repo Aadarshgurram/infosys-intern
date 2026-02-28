@@ -4,7 +4,9 @@ from fastapi.responses import Response
 from twilio.twiml.voice_response import Gather, VoiceResponse
 import json
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Initialize FastAPI application
 app = FastAPI()
 
