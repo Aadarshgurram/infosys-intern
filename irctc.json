@@ -1,0 +1,11 @@
+{
+  "PNR123": {
+    "status": "Confirmed",
+    "coach": "S3",
+    "seat": "45"
+  },
+  "12345": {
+    "departure": "10:00 AM",
+    "arrival": "4:00 PM"
+  }
+}
