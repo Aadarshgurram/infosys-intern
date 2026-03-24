@@ -108,10 +108,10 @@ async def trigger_call():
     call = client.calls.create(
         to="+919490957383",  # Recipient's Indian phone number
         from_=TWILIO_NUMBER,
-        url="https://unproving-nestor-metaphrastically.ngrok-free.dev/voice"
+        url="https://ivr-app.onrender.com/voice"
     )
 
-    return {"call_sid": call.sid, "status": call.status}
+    return {"status": "calling..."}
 
 
 # Language selection endpoint - handles digit 1 or 2 input
