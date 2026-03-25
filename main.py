@@ -4,6 +4,7 @@ from fastapi.responses import Response
 from twilio.twiml.voice_response import Gather, VoiceResponse
 import json
 import os
+import random
 from dotenv import load_dotenv
 from api import get_pnr_status, get_train_status, get_train_schedule
 
@@ -11,6 +12,7 @@ load_dotenv()
 # Initialize FastAPI application
 app = FastAPI()
 sessions = {}
+bookings = {}
 # Root endpoint - returns server status
 @app.get("/")
 async def root():
@@ -35,17 +37,30 @@ async def voice():
     )
 
     gather.say(
-        "Welcome to IRCTC Railway Enquiry System. "
+        "Welcome to IRCTC Enquiry System. "
         "Press 1 for English. "
         "Press 2 for Hindi."
     )
 
     response.append(gather)
-    response.say("No input received. Goodbye.")
-    response.hangup()
+    response.say("No input received. Please try again.")
+    response.redirect("/voice")
 
     return Response(str(response), media_type="application/xml")
 
+BOOKING_FILE = "bookings.json"
+
+def load_bookings():
+    if os.path.exists(BOOKING_FILE):
+        with open(BOOKING_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_bookings(data):
+    with open(BOOKING_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+bookings = load_bookings()
 
 # Helper function to retrieve train timing information from JSON file
 def get_train_timing(train_no):
@@ -140,7 +155,8 @@ async def language(request: Request):
 
     )
         gather.say(
-        "hey Itachi, How can I help you today? "
+        "hey Itachi, How can I help you today?"
+        "you can ask PNR status, train status, ticket booking, which one are you going with "
 )
         response.append(gather)
     elif digit == "2":
@@ -277,6 +293,7 @@ async def language(request: Request):
 #     speechTimeout="auto"
 # )
 
+
 #     gather.say(
 #         "Is there anything else I can help you with?"
 #     )
@@ -360,7 +377,7 @@ async def process_intent(request: Request):
 
     if speech:
 
-        text = speech.lower()
+        text = (speech or "").lower()
         if "no" in text or "thank you" in text or "thanks" in text or "exit" in text or "goodbye" in text or "nothing else" in text or "no thanks" in text:
             response.say("Thank you for calling IRCTC. Have a nice day.")
             response.hangup()
@@ -375,12 +392,23 @@ async def process_intent(request: Request):
         elif "schedule" in text or "timing" in text:
             response.redirect("/ask-schedule")
 
-        elif "book" in text:
+        elif "book" in text or "ticket booking" in text:
             response.redirect("/ask-origin")
+            
+        elif "cancel" in text or "ticket cancel" in text:
+            response.redirect("/ask-cancel-pnr")
 
         else:
-            response.say("Sorry I did not understand")
-            response.redirect("/voice")
+            gather = Gather(
+                input="speech dtmf",
+                action="/process-intent",
+                language="en-IN",
+                speechTimeout="auto"
+            )
+
+        gather.say("Sorry, I did not understand. Please say PNR status, train status, booking, or cancellation.")
+
+        response.append(gather)
         return Response(str(response), media_type="application/xml")
 
     elif digits:
@@ -423,18 +451,13 @@ async def pnr(request: Request):
 
     response = VoiceResponse()
 
-    data = get_pnr_status(pnr_number)
+    data = bookings.get(pnr_number)
 
     if data:
-        passenger = data["passengerList"][0]
-        status = passenger["currentStatus"]
-
-        response.say(
-            f"PNR number {pnr_number}. Your ticket status is {status}"
-        )
+        status = data["status"]
+        response.say(f"PNR number {pnr_number}. Your ticket is {status}")
     else:
-        response.say("Sorry, I could not fetch the PNR status right now.")
-
+        response.say("PNR not found.")
     gather = Gather(
         input="speech dtmf",
         action="/process-intent",
@@ -546,20 +569,23 @@ async def process_date(request: Request):
     date = form.get("SpeechResult")
     call_sid = form.get("CallSid")
 
-    origin = sessions.get(call_sid, {}).get("origin", "unknown")
-    destination = sessions.get(call_sid, {}).get("destination", "unknown")
+    if call_sid not in sessions:
+        sessions[call_sid] = {}
+
+    sessions[call_sid]["date"] = date
 
     response = VoiceResponse()
 
     gather = Gather(
-    input="speech dtmf",
-    action="/confirm-booking",
-    language="en-IN"
-)
+        input="speech dtmf",
+        action="/process-class",
+        language="en-IN",
+        speechTimeout="auto"
+    )
 
     gather.say(
-        f"You want to travel from {origin} to {destination} on {date}. "
-        "Say yes or press 1 to confirm booking."
+        "Which class would you like to travel? "
+        "You can say sleeper, AC 3 tier, or AC 2 tier."
     )
 
     response.append(gather)
@@ -573,16 +599,41 @@ async def confirm_booking(request: Request):
 
     speech = form.get("SpeechResult")
     digits = form.get("Digits")
+    call_sid = form.get("CallSid")
 
     response = VoiceResponse()
 
-    if speech and "yes" in speech.lower():
-        response.say("Your ticket has been successfully booked.")
-        response.say("Your PNR number is 4567891234.")
+    confirm = False
 
+    text = (speech or "").lower().strip()
+
+    if any(word in text for word in ["yes", "yeah", "yup", "confirm", "correct"]):
+        confirm = True
     elif digits == "1":
+        confirm = True
+
+    if confirm:
+        data = sessions.get(call_sid, {})
+
+        origin = data.get("origin")
+        destination = data.get("destination")
+        date = data.get("date")
+        travel_class = data.get("class")
+
+        import random
+        pnr = str(random.randint(1000000000, 9999999999))
+
+        bookings[pnr] = {
+            "origin": origin,
+            "destination": destination,
+            "date": date,
+            "class": travel_class,
+            "status": "Booked"
+        }
+        save_bookings(bookings)
         response.say("Your ticket has been successfully booked.")
-        response.say("Your PNR number is 4567891234.")
+        response.say(f"Your PNR number is {pnr}.")
+        response.say("For full ticket details and confirmation, please visit IRCTC website or app.")
 
     else:
         response.say("Booking cancelled.")
@@ -590,7 +641,6 @@ async def confirm_booking(request: Request):
     response.hangup()
 
     return Response(str(response), media_type="application/xml")
-
 @app.post("/ask-train")
 async def ask_train():
 
@@ -689,5 +739,88 @@ async def train_schedule(request: Request):
 
     gather.say("Is there anything else I can help you with?")
     response.append(gather)
+
+    return Response(str(response), media_type="application/xml")
+
+@app.post("/process-class")
+async def process_class(request: Request):
+
+    form = await request.form()
+
+    travel_class = form.get("SpeechResult")
+    call_sid = form.get("CallSid")
+
+    if call_sid not in sessions:
+        sessions[call_sid] = {}
+
+    sessions[call_sid]["class"] = travel_class
+
+    origin = sessions[call_sid].get("origin")
+    destination = sessions[call_sid].get("destination")
+    date = sessions[call_sid].get("date")
+
+    response = VoiceResponse()
+
+    gather = Gather(
+    input="speech dtmf",
+    action="/confirm-booking",
+    language="en-IN",
+    speechTimeout="auto",
+    timeout=5
+)
+
+    gather.say(
+        f"You want to travel from {origin} to {destination} on {date} "
+        f"in {travel_class} class. "
+        "Say yes or press 1 to confirm booking."
+    )
+
+    response.append(gather)
+
+    return Response(str(response), media_type="application/xml")
+
+@app.post("/ask-cancel-pnr")
+async def ask_cancel_pnr():
+
+    response = VoiceResponse()
+
+    gather = Gather(
+        input="speech dtmf",
+        action="/cancel-ticket",
+        language="en-IN",
+        speechTimeout="auto"
+    )
+
+    gather.say("Please say or enter your PNR number to cancel your ticket")
+
+    response.append(gather)
+
+    return Response(str(response), media_type="application/xml")
+
+@app.post("/cancel-ticket")
+async def cancel_ticket(request: Request):
+
+    form = await request.form()
+
+    pnr = form.get("Digits")
+
+    if not pnr:
+        speech = form.get("SpeechResult")
+        if speech:
+            pnr = "".join(filter(str.isdigit, speech))
+
+    response = VoiceResponse()
+
+    if pnr in bookings:
+        bookings[pnr]["status"] = "Cancelled"
+
+        # ✅ THIS IS THE IMPORTANT LINE
+        save_bookings(bookings)
+
+        response.say(f"Your ticket with PNR {pnr} has been cancelled successfully.")
+    else:
+        response.say("Invalid PNR number.")
+
+    response.hangup()
 
     return Response(str(response), media_type="application/xml")
