@@ -159,7 +159,6 @@ async def language(request: Request):
     )
         gather.say(
         "hey Itachi, How can I help you today?"
-        "you can ask PNR status, train status, ticket booking, which one are you going with "
 )
         response.append(gather)
     elif digit == "2":
@@ -409,10 +408,10 @@ async def process_intent(request: Request):
                 speechTimeout="auto"
             )
 
-        gather.say("Sorry, I did not understand. Please say PNR status, train status, booking, or cancellation.")
+            gather.say("Sorry, I did not understand. Please say PNR status, train status, booking, or cancellation.")
 
-        response.append(gather)
-        return Response(str(response), media_type="application/xml")
+            response.append(gather)
+            return Response(str(response), media_type="application/xml")
 
     elif digits:
 
