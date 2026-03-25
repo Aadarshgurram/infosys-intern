@@ -148,7 +148,7 @@ async def language(request: Request):
     if digit == "1":
         # English selected - display main menu options
         gather = Gather(
-        input="speech dtmf",
+        input="dtmf",
         num_digits=1,
         action="/process-intent",
         language="en-IN",
@@ -367,7 +367,7 @@ async def language(request: Request):
 #     return Response(str(response), media_type="application/xml")
 
 
-@app.post("/process-intent")
+@app.post("/process-intent", methods=["GET", "POST"])
 async def process_intent(request: Request):
 
     form = await request.form()
@@ -387,18 +387,23 @@ async def process_intent(request: Request):
 
         if "pnr" in text:
             response.redirect("/ask-pnr")
+            return Response(str(response), media_type="application/xml")
 
         elif "train" in text and ("status" in text or "running" in text or "live" in text):
             response.redirect("/ask-train")
+            return Response(str(response), media_type="application/xml")
 
         elif "schedule" in text or "timing" in text:
             response.redirect("/ask-schedule")
+            return Response(str(response), media_type="application/xml")
 
         elif "book" in text or "ticket booking" in text:
             response.redirect("/ask-origin")
+            return Response(str(response), media_type="application/xml")
             
         elif "cancel" in text or "ticket cancel" in text:
             response.redirect("/ask-cancel-pnr")
+            return Response(str(response), media_type="application/xml")
 
         else:
             gather = Gather(
@@ -408,27 +413,33 @@ async def process_intent(request: Request):
                 speechTimeout="auto"
             )
 
-            gather.say("Sorry, I did not understand. Please say PNR status, train status, booking, or cancellation.")
+            gather.say("I did not receive any input. Please try again.")
 
             response.append(gather)
+
             return Response(str(response), media_type="application/xml")
 
     elif digits:
 
         if digits == "1":
             response.redirect("/ask-pnr")
+            return Response(str(response), media_type="application/xml")
 
         elif digits == "2":
             response.redirect("/ask-train")
+            return Response(str(response), media_type="application/xml")
 
         elif digits == "3":
             response.redirect("/ask-schedule")
+            return Response(str(response), media_type="application/xml")
 
         elif digits == "4":
             response.redirect("/ask-origin")
+            return Response(str(response), media_type="application/xml")
 
         elif digits == "9":
             response.redirect("/voice")
+            return Response(str(response), media_type="application/xml")
 
         elif digits == "0":
             response.say("Thank you for calling IRCTC. Goodbye.")
@@ -441,7 +452,7 @@ async def process_intent(request: Request):
         return Response(str(response), media_type="application/xml")
 
 
-@app.post("/ask-pnr")
+@app.post("/ask-pnr", methods=["GET", "POST"])
 async def pnr(request: Request):
 
     form_data = await request.form()
@@ -472,7 +483,7 @@ async def pnr(request: Request):
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/ask-origin")
+@app.post("/ask-origin", methods=["GET", "POST"])
 async def ask_origin():
 
     response = VoiceResponse()
@@ -490,7 +501,7 @@ async def ask_origin():
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/process-origin")
+@app.post("/process-origin", methods=["GET", "POST"])
 async def process_origin(request: Request):
 
     form = await request.form()
@@ -534,7 +545,7 @@ async def process_origin(request: Request):
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/process-destination")
+@app.post("/process-destination", methods=["GET", "POST"])
 async def process_destination(request: Request):
 
     form = await request.form()
@@ -563,7 +574,7 @@ async def process_destination(request: Request):
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/process-date")
+@app.post("/process-date", methods=["GET", "POST"])
 async def process_date(request: Request):
 
     form = await request.form()
@@ -594,7 +605,7 @@ async def process_date(request: Request):
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/confirm-booking")
+@app.post("/confirm-booking", methods=["GET", "POST"])
 async def confirm_booking(request: Request):
 
     form = await request.form()
@@ -643,7 +654,7 @@ async def confirm_booking(request: Request):
     response.hangup()
 
     return Response(str(response), media_type="application/xml")
-@app.post("/ask-train")
+@app.post("/ask-train", methods=["GET", "POST"])
 async def ask_train():
 
     response = VoiceResponse()
@@ -661,7 +672,7 @@ async def ask_train():
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/train-status")
+@app.post("/train-status", methods=["GET", "POST"])
 async def train_status(request: Request):
     form_data = await request.form()
     # print("FULL TWILIO FORM:", form_data)
@@ -692,7 +703,7 @@ async def train_status(request: Request):
     response.append(gather)
     return Response(str(response), media_type="application/xml")
 
-@app.post("/ask-schedule")
+@app.post("/ask-schedule", methods=["GET", "POST"])
 async def ask_schedule():
 
     response = VoiceResponse()
@@ -709,7 +720,7 @@ async def ask_schedule():
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/train-schedule")
+@app.post("/train-schedule", methods=["GET", "POST"])
 async def train_schedule(request: Request):
 
     form_data = await request.form()
@@ -744,7 +755,7 @@ async def train_schedule(request: Request):
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/process-class")
+@app.post("/process-class", methods=["GET", "POST"])
 async def process_class(request: Request):
 
     form = await request.form()
@@ -781,7 +792,7 @@ async def process_class(request: Request):
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/ask-cancel-pnr")
+@app.post("/ask-cancel-pnr", methods=["GET", "POST"])
 async def ask_cancel_pnr():
 
     response = VoiceResponse()
@@ -799,7 +810,7 @@ async def ask_cancel_pnr():
 
     return Response(str(response), media_type="application/xml")
 
-@app.post("/cancel-ticket")
+@app.post("/cancel-ticket", methods=["GET", "POST"])
 async def cancel_ticket(request: Request):
 
     form = await request.form()
