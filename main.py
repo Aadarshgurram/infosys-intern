@@ -14,7 +14,7 @@ app = FastAPI()
 sessions = {}
 bookings = {}
 # Root endpoint - returns server status
-@app.get("/")
+@app.api_route("/",methods=["GET","POST"])
 async def root():
     """Health check endpoint to verify server is running."""
     return {"message": "Server Running"}    
@@ -23,13 +23,9 @@ async def root():
 # Initial voice endpoint - greets user and prompts language selection
 @app.api_route("/voice", methods=["GET", "POST"])
 async def voice():
-    """
-    Entry point for incoming calls. 
-    Presents welcome message and language selection (English/Hindi).
-    """
+
     response = VoiceResponse()
 
-    # Create gather object to collect 1 digit input for language selection
     gather = Gather(
         num_digits=1,
         action="/language",
@@ -43,11 +39,8 @@ async def voice():
     )
 
     response.append(gather)
-    response.say("No input received. Please try again.")
-    response.redirect("/voice")
 
     return Response(str(response), media_type="application/xml")
-
 BOOKING_FILE = "bookings.json"
 
 def load_bookings():
@@ -126,7 +119,7 @@ async def trigger_call():
     call = client.calls.create(
         to="+919490957383",  # Recipient's Indian phone number
         from_=TWILIO_NUMBER,
-        url="https://ivr-app.onrender.com/voice"
+        url="https://unproving-nestor-metaphrastically.ngrok-free.dev/voice"
     )
 
     return {"status": "calling..."}
@@ -141,15 +134,14 @@ async def language(request: Request):
     Digit 2 -> Hindi (under development)
     """
     form_data = await request.form()
-    digit = form_data.get("Digits")
+    digit = form_data.get("Digits") or request.query_params.get("Digits")
 
     response = VoiceResponse()
 
     if digit == "1":
         # English selected - display main menu options
         gather = Gather(
-        input="dtmf",
-        num_digits=1,
+        input="speech dtmf",
         action="/process-intent",
         language="en-IN",
         speechTimeout="auto",
@@ -372,8 +364,8 @@ async def process_intent(request: Request):
 
     form = await request.form()
 
-    speech = form.get("SpeechResult")
-    digits = form.get("Digits")
+    speech = form.get("SpeechResult") or request.query_params.get("SpeechResult")
+    digits = form.get("Digits") or request.query_params.get("Digits")
 
     response = VoiceResponse()
 
@@ -506,7 +498,7 @@ async def process_origin(request: Request):
 
     form = await request.form()
 
-    origin = form.get("SpeechResult")
+    origin = form.get("SpeechResult") or request.query_params.get("SpeechResult")
     call_sid = form.get("CallSid")
 
     response = VoiceResponse()
@@ -549,8 +541,7 @@ async def process_origin(request: Request):
 async def process_destination(request: Request):
 
     form = await request.form()
-
-    destination = form.get("SpeechResult")
+    destination = form.get("SpeechResult") or request.query_params.get("SpeechResult")
     call_sid = form.get("CallSid")
 
     # ensure session exists
@@ -579,7 +570,7 @@ async def process_date(request: Request):
 
     form = await request.form()
 
-    date = form.get("SpeechResult")
+    date = form.get("SpeechResult") or request.query_params.get("SpeechResult")
     call_sid = form.get("CallSid")
 
     if call_sid not in sessions:
@@ -610,8 +601,8 @@ async def confirm_booking(request: Request):
 
     form = await request.form()
 
-    speech = form.get("SpeechResult")
-    digits = form.get("Digits")
+    speech = form.get("SpeechResult") or request.query_params.get("SpeechResult")
+    digits = form.get("Digits") or request.query_params.get("Digits")
     call_sid = form.get("CallSid")
 
     response = VoiceResponse()
@@ -646,10 +637,12 @@ async def confirm_booking(request: Request):
         save_bookings(bookings)
         response.say("Your ticket has been successfully booked.")
         response.say(f"Your PNR number is {pnr}.")
-        response.say("For full ticket details and confirmation, please visit IRCTC website or app.")
+        response.say("Please confirm your ticket on the IRCTC website or mobile application.")
+        response.say("Thank you for using IRCTC enquiry system.")
 
     else:
-        response.say("Booking cancelled.")
+        response.say("Your booking has been cancelled.")
+        response.say("You can start a new booking anytime.")
 
     response.hangup()
 
@@ -760,7 +753,7 @@ async def process_class(request: Request):
 
     form = await request.form()
 
-    travel_class = form.get("SpeechResult")
+    travel_class = form.get("SpeechResult") or request.query_params.get("SpeechResult")
     call_sid = form.get("CallSid")
 
     if call_sid not in sessions:
