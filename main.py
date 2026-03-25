@@ -52,8 +52,11 @@ BOOKING_FILE = "bookings.json"
 
 def load_bookings():
     if os.path.exists(BOOKING_FILE):
-        with open(BOOKING_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(BOOKING_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {}
     return {}
 
 def save_bookings(data):
