@@ -41,8 +41,7 @@ async def voice():
     response.append(gather)
 
     return Response(str(response), media_type="application/xml")
-BOOKING_FILE = "bookings.json"
-
+BOOKING_FILE = "temp_booking.json"
 def load_bookings():
     if os.path.exists(BOOKING_FILE):
         try:
@@ -53,7 +52,7 @@ def load_bookings():
     return {}
 
 def save_bookings(data):
-    with open(BOOKING_FILE, "w") as f:
+    with open(BOOKING_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
 
 bookings = load_bookings()
@@ -624,7 +623,6 @@ async def confirm_booking(request: Request):
         date = data.get("date")
         travel_class = data.get("class")
 
-        import random
         pnr = str(random.randint(1000000000, 9999999999))
 
         bookings[pnr] = {
@@ -634,17 +632,30 @@ async def confirm_booking(request: Request):
             "class": travel_class,
             "status": "Booked"
         }
-        save_bookings(bookings)
-        response.say("Your ticket has been successfully booked.")
-        response.say(f"Your PNR number is {pnr}.")
-        response.say("Please confirm your ticket on the IRCTC website or mobile application.")
+
+        # save_bookings(bookings)
+        
+
+        # response.say("Your ticket has been successfully booked.")
+        # response.say(f"Your PNR number is {pnr}.")
+        response.say("Please confirm your ticket on the IRCTC website")
         response.say("Thank you for using IRCTC enquiry system.")
 
     else:
         response.say("Your booking has been cancelled.")
         response.say("You can start a new booking anytime.")
 
-    response.hangup()
+    # 🔥 CONTINUE CALL INSTEAD OF ENDING
+    gather = Gather(
+        input="speech dtmf",
+        action="/process-intent",
+        language="en-IN",
+        speechTimeout="auto"
+    )
+
+    gather.say("Is there anything else I can help you with?")
+
+    response.append(gather)
 
     return Response(str(response), media_type="application/xml")
 @app.api_route("/ask-train", methods=["GET", "POST"])
@@ -669,9 +680,10 @@ async def ask_train():
 async def train_status(request: Request):
     form_data = await request.form()
     # print("FULL TWILIO FORM:", form_data)
-    train_number = form_data.get("Digits")
+    train_number = form_data.get("Digits") or request.query_params.get("Digits")
+
     if not train_number:
-        speech = form_data.get("SpeechResult")
+        speech = form_data.get("SpeechResult") or request.query_params.get("SpeechResult")
         if speech:
             train_number = "".join(filter(str.isdigit, speech))
     print("TRAIN NUMBER:", train_number)
@@ -717,9 +729,10 @@ async def ask_schedule():
 async def train_schedule(request: Request):
 
     form_data = await request.form()
-    train_number = form_data.get("Digits")
+    train_number = form_data.get("Digits") or request.query_params.get("Digits")
+
     if not train_number:
-        speech = form_data.get("SpeechResult")
+        speech = form_data.get("SpeechResult") or request.query_params.get("SpeechResult")
         if speech:
             train_number = "".join(filter(str.isdigit, speech))
     response = VoiceResponse()
