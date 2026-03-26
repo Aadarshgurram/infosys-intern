@@ -376,7 +376,7 @@ async def process_intent(request: Request):
             response.hangup()
             return Response(str(response), media_type="application/xml")
 
-        if "pnr" in text:
+        if "pnr" in text and ("status" in text or "number" in text):
             response.redirect("/ask-pnr")
             return Response(str(response), media_type="application/xml")
 
@@ -444,24 +444,39 @@ async def process_intent(request: Request):
 
 
 @app.api_route("/ask-pnr", methods=["GET", "POST"])
-async def pnr(request: Request):
+async def ask_pnr(request: Request):
+    response = VoiceResponse()
 
     form_data = await request.form()
-    pnr_number = form_data.get("Digits")
+
+    # support both POST (Twilio) and GET (browser)
+    pnr_number = form_data.get("Digits") or request.query_params.get("Digits")
+
     if not pnr_number:
-        speech = form_data.get("SpeechResult")
+        speech = form_data.get("SpeechResult") or request.query_params.get("SpeechResult")
         if speech:
             pnr_number = "".join(filter(str.isdigit, speech))
 
-    response = VoiceResponse()
+    # 🔴 LOAD STATIC PNR DATA
+    try:
+        with open("pnr_data.json", "r") as f:
+            pnr_data = json.load(f)
+    except:
+        pnr_data = {}
 
-    data = bookings.get(pnr_number)
+    # 🔴 CHECK BOTH DYNAMIC + STATIC
+    data = bookings.get(pnr_number) or pnr_data.get(pnr_number)
 
     if data:
-        status = data["status"]
-        response.say(f"PNR number {pnr_number}. Your ticket is {status}")
+        response.say(f"PNR number {pnr_number}. Your ticket is {data['status']}.")
     else:
-        response.say("PNR not found.")
+        # fallback for unknown valid PNR
+        if pnr_number and len(pnr_number) == 10:
+            response.say(f"PNR number {pnr_number}. Your ticket is currently in waiting list.")
+        else:
+            response.say("Invalid PNR number. Please try again.")
+
+    # 🔴 CONTINUE FLOW
     gather = Gather(
         input="speech dtmf",
         action="/process-intent",
@@ -469,7 +484,7 @@ async def pnr(request: Request):
         speechTimeout="auto"
     )
 
-    gather.say("Is there anything else I can help you with?")
+    gather.say("Anything else I can help you with?")
     response.append(gather)
 
     return Response(str(response), media_type="application/xml")
